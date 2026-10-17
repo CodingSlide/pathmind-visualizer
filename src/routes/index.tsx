@@ -39,11 +39,15 @@ function Index() {
   const drawing = useRef(false);
 
   // Seed a maze on the client after hydration (random).
-  useEffect(() => { setGrid(generateMaze(21)); }, []);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setGrid(generateMaze(21)); setMounted(true); }, []);
 
   const comparison = useMemo(
-    () => ALGOS.map((a) => ({ ...a, ...timeSearch(grid, a.id, heuristic) })),
-    [grid, heuristic],
+    () => ALGOS.map((a) => {
+      const t = timeSearch(grid, a.id, heuristic);
+      return { ...a, ...t, ms: mounted ? t.ms : 0 };
+    }),
+    [grid, heuristic, mounted],
   );
   const current = comparison.find((c) => c.id === algo)!;
   const { result } = current;

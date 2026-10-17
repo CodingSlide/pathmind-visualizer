@@ -170,3 +170,4 @@
 @keyframes pop { from { transform: scale(0.4); } to { transform: scale(1); } }
 @utility cell-pop { animation: pop 180ms ease-out; }
 @utility panel { @apply rounded-xl border border-border bg-card; }
+@utility input { @apply w-full rounded-lg border border-input bg-card px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring; }

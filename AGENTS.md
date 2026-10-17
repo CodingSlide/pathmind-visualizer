@@ -8,3 +8,4 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+- Search algorithms live in src/lib/search.ts as pure functions (tested in src/test/search.test.ts); the UI only animates their recorded expansion order.

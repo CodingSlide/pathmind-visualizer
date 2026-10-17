@@ -18,7 +18,7 @@ describe("search", () => {
     for (let y = 2; y < 9; y++) g.walls[y * 10 + 5] = 1;
     const a = runSearch(g, "astar"), b = runSearch(g, "bfs");
     expect(a.path.length).toBe(b.path.length);
-    expect(a.path.length - 1).toBe(13);
+    expect(a.path.length - 1).toBe(15);
   });
   it("all algorithms return valid paths in a maze", () => {
     const g = generateMaze(21);

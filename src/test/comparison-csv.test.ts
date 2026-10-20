@@ -7,7 +7,7 @@ it("exports all current algorithm results with actual nodes and path steps", () 
   const rows = ALGOS.map((a) => ({ ...a, result: runSearch(grid, a.id), ms: 0.123456 }));
   const csv = comparisonCsv(rows, grid, "manhattan");
   expect(csv.trim().split("\r\n")).toHaveLength(5);
-  expect(csv).toContain('"Breadth-First Search","true","' + rows[1].result.order.length + '","8","0.123456","true","11x11","manhattan"');
+  expect(csv).toContain('"Breadth-First Search","true","' + runSearch(grid, "bfs").order.length + '","8","0.123456","true","11x11","manhattan"');
 });
 
 it("exports unreachable paths as empty, not a negative length", () => {

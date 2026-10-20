@@ -48,19 +48,25 @@ class MinHeap {
     let i = a.length - 1;
     while (i > 0) {
       const p = (i - 1) >> 1;
-      if (this.lt(a[i], a[p])) { [a[i], a[p]] = [a[p], a[i]]; i = p; } else break;
+      const child = a[i], parent = a[p];
+      if (child && parent && this.lt(child, parent)) { a[i] = parent; a[p] = child; i = p; } else break;
     }
   }
   pop() {
-    const a = this.a, top = a[0], last = a.pop()!;
+    const a = this.a, top = a[0], last = a.pop();
+    if (!top || !last) return undefined;
     if (a.length) {
       a[0] = last; let i = 0;
       for (;;) {
         const l = 2 * i + 1, r = l + 1; let m = i;
-        if (l < a.length && this.lt(a[l], a[m])) m = l;
-        if (r < a.length && this.lt(a[r], a[m])) m = r;
+        const left = a[l], right = a[r], candidate = a[m];
+        if (left && candidate && this.lt(left, candidate)) m = l;
+        const next = a[m];
+        if (right && next && this.lt(right, next)) m = r;
         if (m === i) break;
-        [a[i], a[m]] = [a[m], a[i]]; i = m;
+        const current = a[i], replacement = a[m];
+        if (!current || !replacement) break;
+        a[i] = replacement; a[m] = current; i = m;
       }
     }
     return top;
@@ -84,7 +90,9 @@ export function runSearch(grid: Grid, algo: Algo, heuristic: Heuristic = "manhat
   if (algo === "bfs") {
     const q = [start]; let head = 0; addedAt[start] = 0;
     while (head < q.length) {
-      const c = q[head++]; expand(c);
+      const c = q[head++];
+      if (c === undefined) break;
+      expand(c);
       if (c === goal) { found = true; break; }
       for (const nb of neighbors(c, n, walls)) {
         if (addedAt[nb] === -1) { addedAt[nb] = step; parent[nb] = c; q.push(nb); }
@@ -93,14 +101,16 @@ export function runSearch(grid: Grid, algo: Algo, heuristic: Heuristic = "manhat
   } else if (algo === "dfs") {
     const st = [start]; addedAt[start] = 0;
     while (st.length) {
-      const c = st.pop()!;
+      const c = st.pop();
+      if (c === undefined) break;
       if (visitedAt[c] !== -1) continue;
       expand(c);
       if (c === goal) { found = true; break; }
       const nbs = neighbors(c, n, walls);
       for (let k = nbs.length - 1; k >= 0; k--) {
         const nb = nbs[k];
-        if (visitedAt[nb] === -1) { parent[nb] = c; addedAt[nb] = addedAt[nb] === -1 ? step : addedAt[nb]; st.push(nb); }
+        if (nb === undefined) continue;
+        if (visitedAt[nb] === -1) { parent[nb] = c; addedAt[nb] = addedAt[nb] === -1 ? step : (addedAt[nb] ?? step); st.push(nb); }
       }
     }
   } else {
@@ -109,15 +119,17 @@ export function runSearch(grid: Grid, algo: Algo, heuristic: Heuristic = "manhat
     const heap = new MinHeap(); let tie = 0;
     heap.push([h(start, goal, n, heuristic), 0, start]); addedAt[start] = 0;
     while (heap.size) {
-      const [, , c] = heap.pop();
+      const entry = heap.pop();
+      if (!entry) break;
+      const [, , c] = entry;
       if (visitedAt[c] !== -1) continue;
       expand(c);
       if (c === goal) { found = true; break; }
       for (const nb of neighbors(c, n, walls)) {
         if (visitedAt[nb] !== -1) continue;
-        const ng = g[c] + 1;
+        const ng = (g[c] ?? Infinity) + 1;
         if (algo === "astar") {
-          if (ng < g[nb]) {
+          if (ng < (g[nb] ?? Infinity)) {
             g[nb] = ng; parent[nb] = c;
             if (addedAt[nb] === -1) addedAt[nb] = step;
             const hv = h(nb, goal, n, heuristic);
@@ -133,7 +145,7 @@ export function runSearch(grid: Grid, algo: Algo, heuristic: Heuristic = "manhat
 
   const path: number[] = [];
   if (found) {
-    for (let c = goal; c !== -1; c = parent[c]) path.push(c);
+    for (let c = goal; c !== -1; c = parent[c] ?? -1) path.push(c);
     path.reverse();
   }
   return { order, visitedAt, addedAt, path, found };
@@ -144,7 +156,7 @@ export function timeSearch(grid: Grid, algo: Algo, heuristic: Heuristic) {
   const reps = 15;
   runSearch(grid, algo, heuristic);
   const t0 = performance.now();
-  let res!: SearchResult;
+  let res = runSearch(grid, algo, heuristic);
   for (let i = 0; i < reps; i++) res = runSearch(grid, algo, heuristic);
   return { result: res, ms: (performance.now() - t0) / reps };
 }
@@ -165,13 +177,17 @@ export function generateMaze(size: number, rand = Math.random): Grid {
   const stack: [number, number][] = [[1, 1]];
   walls[size + 1] = 0;
   while (stack.length) {
-    const [x, y] = stack[stack.length - 1];
+    const position = stack[stack.length - 1];
+    if (!position) break;
+    const [x, y] = position;
     const dirs = ([[2, 0], [-2, 0], [0, 2], [0, -2]] as const).filter(([dx, dy]) => {
       const nx = x + dx, ny = y + dy;
       return nx > 0 && ny > 0 && nx < size - 1 && ny < size - 1 && walls[ny * size + nx];
     });
     if (!dirs.length) { stack.pop(); continue; }
-    const [dx, dy] = dirs[Math.floor(rand() * dirs.length)];
+    const direction = dirs[Math.floor(rand() * dirs.length)];
+    if (!direction) break;
+    const [dx, dy] = direction;
     walls[(y + dy / 2) * size + x + dx / 2] = 0;
     walls[(y + dy) * size + x + dx] = 0;
     stack.push([x + dx, y + dy]);

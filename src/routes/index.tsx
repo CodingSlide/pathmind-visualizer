@@ -56,7 +56,7 @@ function Index() {
     }),
     [grid, heuristic, mounted],
   );
-  const current = comparison.find((c) => c.id === algo) ?? comparison[0];
+  const current = comparison.find((c) => c.id === algo) ?? { result: timeSearch(grid, algo, heuristic).result, ms: 0 };
   const { result } = current;
   const total = result.order.length + result.path.length;
   const done = step >= total;
@@ -112,9 +112,9 @@ function Index() {
     const pk = pathSet.get(i);
     const vs = step - result.order.length;
     if (pk !== undefined && pk < vs) return "bg-path cell-pop";
-    const v = result.visitedAt[i];
+    const v = result.visitedAt[i] ?? -1;
     if (v !== -1 && v < step) return "bg-visited";
-    const a = result.addedAt[i];
+    const a = result.addedAt[i] ?? -1;
     if (a !== -1 && a <= step && (v === -1 || v >= step)) return "bg-frontier";
     return "bg-cell";
   };
@@ -124,7 +124,7 @@ function Index() {
     step < 0 ? "Ready" : !done ? (playing ? "Searching…" : "Paused") : result.found ? "Path found" : "No path";
 
   const n = grid.size;
-  const algoMeta = ALGOS.find((a) => a.id === algo) ?? ALGOS[0];
+  const algoMeta = ALGOS.find((a) => a.id === algo) ?? { name: "A* Search" };
   const minLen = comparison.find((c) => c.id === "bfs")?.result.path.length;
 
   return (

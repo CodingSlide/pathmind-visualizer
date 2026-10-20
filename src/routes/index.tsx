@@ -218,7 +218,7 @@ function Index() {
           <img src="/ICON.png" alt="PathMind AI" className="h-12 w-12 shrink-0" />
           <div className="min-w-0">
             <h1 className="truncate text-lg font-bold leading-tight">
-              PathMind AI <span className="font-medium text-muted-foreground">· {gameView === "chess" ? "AI Chess Arena" : "Search Algorithm Visualizer"}</span>
+              PathMind AI <span className="hidden font-medium text-muted-foreground sm:inline">· {gameView === "chess" ? "AI Chess Arena" : "Search Algorithm Visualizer"}</span>
             </h1>
             <p className="truncate text-xs text-muted-foreground">Explore how AI search algorithms find a path</p>
           </div>

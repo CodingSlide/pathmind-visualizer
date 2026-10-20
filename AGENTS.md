@@ -9,3 +9,6 @@
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
 - Search algorithms live in src/lib/search.ts as pure functions (tested in src/test/search.test.ts); the UI only animates their recorded expansion order.
+- Chess uses chess.js for legal moves and match state, with pure minimax/alpha-beta search in a browser worker so deeper searches cannot block controls.
+- Pathfinding and chess share the index workspace and a single game selector; switching pauses play while preserving each board.
+- Comparison CSV is generated from the same measured rows displayed in the UI, with browser Blob delivery to avoid a server dependency.

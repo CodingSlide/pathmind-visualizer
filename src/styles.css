@@ -67,11 +67,22 @@
   --color-start: var(--start);
   --color-goal: var(--goal);
   --color-success: var(--success);
+  --color-chess-light: var(--chess-light);
+  --color-chess-dark: var(--chess-dark);
+  --color-chess-coordinate: var(--chess-coordinate);
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 :root {
+  --chess-light: oklch(0.96 0.008 160);
+  --chess-dark: oklch(0.65 0.055 160);
+  --chess-coordinate: oklch(0.27 0.025 160);
+  --chess-white-piece: oklch(0.99 0 0);
+  --chess-black-piece: oklch(0.2 0.015 160);
+  --chess-piece-outline: oklch(0.26 0.01 160);
+  --chess-highlight: oklch(0.85 0.15 95 / 55%);
+  --chess-check: oklch(0.65 0.22 25 / 60%);
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.129 0.042 264.695);
@@ -171,3 +182,12 @@
 @utility cell-pop { animation: pop 180ms ease-out; }
 @utility panel { @apply rounded-xl border border-border bg-card; }
 @utility input { @apply w-full rounded-lg border border-input bg-card px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring; }
+
+.chess-board { aspect-ratio: 1; max-width: 640px; container-type: inline-size; }
+.chess-piece { font-family: "DejaVu Sans", "Segoe UI Symbol", "Arial Unicode MS", serif; font-size: 9.5cqw; line-height: 1; position: relative; z-index: 1; }
+.chess-piece-white { color: var(--chess-white-piece); -webkit-text-stroke: 1px var(--chess-piece-outline); }
+.chess-piece-black { color: var(--chess-black-piece); -webkit-text-stroke: 0.5px var(--chess-white-piece); }
+.chess-last-move::after, .chess-check::after { content: ""; position: absolute; inset: 0; background: var(--chess-highlight); pointer-events: none; }
+.chess-check::after { background: var(--chess-check); }
+@media (min-width: 1024px) { .chess-board { max-width: min(640px, calc(100dvh - 180px)); } }
+@media (prefers-reduced-motion: reduce) { .cell-pop { animation: none; } * { transition-duration: 0s !important; } }

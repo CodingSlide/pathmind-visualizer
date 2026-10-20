@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Brain, Settings2, Play, Pause, RotateCcw, StepForward, Box, Trash2, Square, Eraser,
   Flag, MapPin, Network, Route as RouteIcon, Timer, CheckCircle2, XCircle, Activity,
-  Table2, BarChart3, Clock,
+  Table2, BarChart3, Clock, Download, Crown,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, Cell, LabelList,
@@ -11,14 +11,20 @@ import {
 import {
   ALGOS, emptyGrid, generateMaze, timeSearch, type Algo, type Grid, type Heuristic,
 } from "@/lib/search";
+import { Button } from "@/components/ui/button";
+import { AlgorithmGuide } from "@/components/algorithm-guide";
+import { ChessArena } from "@/components/chess-arena";
+import { comparisonCsv, downloadComparison } from "@/lib/comparison-csv";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "PathMind AI — Search Algorithm Visualizer" },
-      { name: "description", content: "Visualize and compare A*, BFS, DFS and Greedy Best-First search on an interactive maze grid." },
+      { name: "description", content: "Compare pathfinding algorithms, export measured results, and watch minimax versus alpha-beta AI chess in PathMind AI." },
       { property: "og:title", content: "PathMind AI — Search Algorithm Visualizer" },
       { property: "og:description", content: "Interactive maze grid comparing A*, BFS, DFS and Greedy search with real measured stats." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Index,
@@ -28,6 +34,7 @@ type Mode = "wall" | "erase" | "start" | "goal";
 const CHART_COLORS = ["var(--primary)", "var(--chart-1)", "var(--path)", "var(--chart-4)"];
 
 function Index() {
+  const [gameView, setGameView] = useState<"pathfinding" | "chess">("pathfinding");
   const [size, setSize] = useState(21);
   const [grid, setGrid] = useState<Grid>(() => emptyGrid(21));
   const [algo, setAlgo] = useState<Algo>("astar");
@@ -49,7 +56,7 @@ function Index() {
     }),
     [grid, heuristic, mounted],
   );
-  const current = comparison.find((c) => c.id === algo)!;
+  const current = comparison.find((c) => c.id === algo) ?? { result: timeSearch(grid, algo, heuristic).result, ms: 0 };
   const { result } = current;
   const total = result.order.length + result.path.length;
   const done = step >= total;
@@ -105,9 +112,9 @@ function Index() {
     const pk = pathSet.get(i);
     const vs = step - result.order.length;
     if (pk !== undefined && pk < vs) return "bg-path cell-pop";
-    const v = result.visitedAt[i];
+    const v = result.visitedAt[i] ?? -1;
     if (v !== -1 && v < step) return "bg-visited";
-    const a = result.addedAt[i];
+    const a = result.addedAt[i] ?? -1;
     if (a !== -1 && a <= step && (v === -1 || v >= step)) return "bg-frontier";
     return "bg-cell";
   };
@@ -117,8 +124,8 @@ function Index() {
     step < 0 ? "Ready" : !done ? (playing ? "Searching…" : "Paused") : result.found ? "Path found" : "No path";
 
   const n = grid.size;
-  const algoMeta = ALGOS.find((a) => a.id === algo)!;
-  const minLen = comparison.find((c) => c.id === "bfs")!.result.path.length;
+  const algoMeta = ALGOS.find((a) => a.id === algo) ?? { name: "A* Search" };
+  const minLen = comparison.find((c) => c.id === "bfs")?.result.path.length;
 
   return (
     <main className="flex min-h-screen flex-col gap-3 bg-background p-3 text-foreground lg:h-screen lg:overflow-hidden">
@@ -128,22 +135,30 @@ function Index() {
           <Brain className="h-8 w-8 shrink-0 text-primary" aria-hidden />
           <div className="min-w-0">
             <h1 className="truncate text-lg font-bold leading-tight">
-              PathMind AI <span className="font-medium text-muted-foreground">· Search Algorithm Visualizer</span>
+              PathMind AI <span className="font-medium text-muted-foreground">· {gameView === "chess" ? "AI Chess Arena" : "Search Algorithm Visualizer"}</span>
             </h1>
             <p className="truncate text-xs text-muted-foreground">Explore how AI search algorithms find a path</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 items-center gap-1 rounded-md border border-border p-1" role="tablist" aria-label="Game">
+          <Button size="sm" variant={gameView === "pathfinding" ? "default" : "ghost"} role="tab" aria-selected={gameView === "pathfinding"} onClick={() => { setGameView("pathfinding"); setPlaying(false); }}><Network />Pathfinding</Button>
+          <Button size="sm" variant={gameView === "chess" ? "default" : "ghost"} role="tab" aria-selected={gameView === "chess"} onClick={() => { setGameView("chess"); setPlaying(false); }}><Crown />Chess</Button>
+        </div>
+        <div className={gameView === "pathfinding" ? "flex gap-2" : "hidden"}>
           <Btn onClick={() => { setGrid(generateMaze(size)); resetRun(); }}><Box className="h-4 w-4" />Random Maze</Btn>
           <Btn onClick={() => { setGrid(emptyGrid(size)); resetRun(); }}><Trash2 className="h-4 w-4" />Clear Grid</Btn>
         </div>
       </header>
+
+      <div className={gameView === "chess" ? "flex min-h-0 flex-1 flex-col" : "hidden"}><ChessArena active={gameView === "chess"} /></div>
+      <div className={gameView === "pathfinding" ? "flex min-h-0 flex-1 flex-col gap-3" : "hidden"}>
 
       {/* Workspace */}
       <section className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[260px_minmax(0,1fr)_280px]">
         {/* Controls */}
         <aside className="panel flex flex-col gap-3 p-4 lg:overflow-y-auto" aria-label="Controls">
           <PanelTitle icon={Settings2}>Algorithm & Settings</PanelTitle>
+          <AlgorithmGuide rows={comparison} heuristic={heuristic} />
           <Field label="Algorithm">
             <select className="input" value={algo} onChange={(e) => { setAlgo(e.target.value as Algo); resetRun(); }}>
               {ALGOS.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -178,10 +193,10 @@ function Index() {
                 ["wall", "Add wall", Square], ["erase", "Erase", Eraser],
                 ["start", "Set start", MapPin], ["goal", "Set goal", Flag],
               ] as const).map(([m, label, I]) => (
-                <button key={m} role="radio" aria-checked={mode === m} onClick={() => setMode(m)}
+                <Button variant="outline" size="sm" key={m} role="radio" aria-checked={mode === m} onClick={() => setMode(m)}
                   className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${mode === m ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted"}`}>
                   <I className="h-4 w-4" />{label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -240,7 +255,7 @@ function Index() {
       {/* Comparison */}
       <section className="grid gap-3 lg:h-[230px] lg:shrink-0 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <div className="panel overflow-x-auto p-4">
-          <PanelTitle icon={Table2}>Algorithm Comparison</PanelTitle>
+           <div className="flex flex-wrap items-center justify-between gap-1"><PanelTitle icon={Table2}>Algorithm Comparison</PanelTitle><Button size="sm" variant="ghost" aria-label="Export comparison CSV" title="Export current results as CSV" onClick={() => downloadComparison(comparisonCsv(comparison, grid, heuristic))}><Download />CSV</Button></div>
           <table className="mt-2 w-full text-xs">
             <thead className="text-muted-foreground">
               <tr className="border-b border-border">
@@ -290,16 +305,16 @@ function Index() {
           </LineChart>
         </ChartCard>
       </section>
+      </div>
     </main>
   );
 }
 
 function Btn({ children, onClick, primary }: { children: React.ReactNode; onClick: () => void; primary?: boolean }) {
   return (
-    <button onClick={onClick}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${primary ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border bg-card hover:bg-muted"}`}>
+    <Button onClick={onClick} size="sm" variant={primary ? "default" : "outline"} className="gap-1.5">
       {children}
-    </button>
+    </Button>
   );
 }
 

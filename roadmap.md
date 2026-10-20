@@ -1,0 +1,3 @@
+- [x] Export current comparison results as CSV and verify download.
+- [x] Explain all four pathfinding algorithms and measured timing.
+- [x] Add AI-versus-AI chess with minimax and alpha-beta, a shared game switch, and verify play.

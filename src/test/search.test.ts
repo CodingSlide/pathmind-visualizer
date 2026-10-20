@@ -6,7 +6,9 @@ const algos: Algo[] = ["astar", "bfs", "dfs", "greedy"];
 function validPath(g: ReturnType<typeof emptyGrid>, p: number[]) {
   if (p[0] !== g.start || p[p.length - 1] !== g.goal) return false;
   for (let i = 1; i < p.length; i++) {
-    const a = p[i - 1], b = p[i], d = Math.abs(a - b);
+    const a = p[i - 1], b = p[i];
+    if (a === undefined || b === undefined) return false;
+    const d = Math.abs(a - b);
     if (g.walls[b] || !(d === 1 || d === g.size)) return false;
   }
   return true;

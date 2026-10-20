@@ -9,5 +9,4 @@ Below the main workspace, display an algorithm comparison table and Recharts vis
 Implement real, working search algorithms in JavaScript. Calculate all statistics from actual executions; do not use hardcoded sample results. Ensure the algorithms work with interactive obstacles and produce correct paths. Keep the interface visually polished, accessible, and responsive. On smaller screens, rearrange the layout rather than allowing horizontal overflow. No separate pages, unnecessary navigation, or decorative elements that reduce the space available for the visualization.
 
 ## Development
-
 Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).

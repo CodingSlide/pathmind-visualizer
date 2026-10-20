@@ -241,7 +241,7 @@ function Index() {
       <div className={gameView === "pathfinding" ? "flex min-h-0 flex-1 flex-col gap-3" : "hidden"}>
 
       {/* Workspace */}
-      <section className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[260px_minmax(0,1fr)_280px]">
+      <section className="grid min-h-0 flex-1 gap-3 grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_280px]">
         {/* Controls */}
         <aside className="panel flex flex-col gap-3 p-4 lg:overflow-y-auto" aria-label="Controls">
           <PanelTitle icon={Settings2}>Algorithm & Settings</PanelTitle>
@@ -324,9 +324,9 @@ function Index() {
         </aside>
 
         {/* Grid */}
-        <div className="panel flex min-h-0 items-center justify-center p-3">
+        <div className="panel flex min-h-0 items-center justify-center p-3 order-2 lg:order-none">
           <div
-            className="grid aspect-square w-full select-none gap-px overflow-hidden rounded-md border border-border bg-border lg:h-full lg:w-auto lg:max-w-full"
+            className="grid aspect-square w-full max-w-md select-none gap-px overflow-hidden rounded-md border border-border bg-border lg:h-full lg:w-auto lg:max-w-full"
             style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, touchAction: "none" }}
             onPointerUp={() => (drawing.current = false)}
             onPointerLeave={() => (drawing.current = false)}
@@ -388,7 +388,7 @@ function Index() {
       </section>
 
       {/* Comparison */}
-      <section className={learningMode ? "hidden" : "grid gap-3 lg:h-[230px] lg:shrink-0 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]"}>
+      <section className={learningMode ? "hidden" : "grid gap-3 grid-cols-1 lg:h-[230px] lg:shrink-0 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]"}>
         <div className="panel overflow-x-auto p-4">
            <div className="flex flex-wrap items-center justify-between gap-1"><PanelTitle icon={Table2}>Algorithm Comparison</PanelTitle><Button size="sm" variant="ghost" aria-label="Export comparison CSV" title="Export current results as CSV" onClick={() => downloadComparison(comparisonCsv(comparison, grid, heuristic))}><Download />CSV</Button></div>
           <table className="mt-2 w-full text-xs">

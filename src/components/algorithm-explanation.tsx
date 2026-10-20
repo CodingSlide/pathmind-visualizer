@@ -205,7 +205,7 @@ export function AlgorithmExplanation({ algo, heuristic }: AlgorithmExplanationPr
         <DialogDescription>Understanding the algorithm step by step</DialogDescription>
 
         <Tabs defaultValue="overview" className="mt-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="steps">Steps</TabsTrigger>
             <TabsTrigger value="formula">Formula</TabsTrigger>

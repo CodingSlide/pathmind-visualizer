@@ -68,7 +68,7 @@ export function ChessArena({ active }: { active: boolean }) {
   else if (game.current.isDraw()) status = "Draw · 50-move rule";
   else if (game.current.isCheck()) status += " · check";
 
-  return <section className="chess-workspace grid min-h-0 flex-1 gap-3 lg:grid-cols-[260px_minmax(0,1fr)_280px]" aria-label="Chess arena">
+  return <section className="chess-workspace grid min-h-0 flex-1 gap-3 grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_280px]" aria-label="Chess arena">
     <aside className="panel flex flex-col gap-4 p-4 lg:overflow-y-auto">
       <h2 className="flex items-center gap-2 text-sm font-semibold"><Cpu className="h-4 w-4 text-primary" />AI match settings</h2>
       {([["w", "White algorithm", white], ["b", "Black algorithm", black]] as const).map(([side, label, value]) => <label key={side} className="text-xs font-medium">{label}<select aria-label={label} className="input mt-1" value={value} onChange={(e) => { cancel(); (side === "w" ? setWhite : setBlack)(e.target.value as ChessAlgorithm); }}>{CHESS_ALGORITHMS.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>)}
@@ -82,9 +82,9 @@ export function ChessArena({ active }: { active: boolean }) {
       <ChessGuide />
       <div className="mt-auto border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground"><h3 className="mb-2 font-semibold text-foreground">Search matchup</h3><p>Both engines use the same material and piece-position evaluation. Alpha-beta skips branches that cannot improve the decision; minimax evaluates every branch to the selected depth.</p></div>
     </aside>
-    <div className="panel flex min-h-0 flex-col items-center justify-center gap-2 p-3">
+    <div className="panel flex min-h-0 flex-col items-center justify-center gap-2 p-3 order-2 lg:order-none">
       <div className="flex w-full items-center justify-between text-xs"><span className="flex items-center gap-2"><Crown className="h-4 w-4" />{flipped ? "White" : "Black"} · {nameOf(flipped ? white : black)}</span><Button size="icon" variant="ghost" title="Flip board" aria-label="Flip board" onClick={() => setFlipped((f) => !f)}><ArrowDownUp /></Button></div>
-      <div className="chess-board grid w-full shrink-0 grid-cols-8 overflow-hidden rounded-md border border-border" role="img" aria-label="Chess board">
+      <div className="chess-board grid w-full max-w-sm shrink-0 grid-cols-8 overflow-hidden rounded-md border border-border" role="img" aria-label="Chess board">
         {ranks.flatMap((rank, y) => [...files].map((file, x) => {
           const square = `${file}${rank}`;
           const piece = board[8 - rank]?.[file.charCodeAt(0) - 97];
@@ -111,7 +111,7 @@ export function ChessArena({ active }: { active: boolean }) {
 function ChessGuide() {
   return <Dialog><DialogTrigger asChild><Button size="sm" variant="outline"><BookOpen />Chess algorithm guide</Button></DialogTrigger><DialogContent className="max-h-[85dvh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto"><DialogTitle>How the chess engines decide</DialogTitle><DialogDescription>Minimax versus alpha-beta pruning · both sides play automatically</DialogDescription>
     <Tabs defaultValue="minimax" className="mt-4">
-      <TabsList className="grid w-full grid-cols-3">
+      <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
         <TabsTrigger value="minimax">Minimax</TabsTrigger>
         <TabsTrigger value="alphabeta">Alpha-Beta</TabsTrigger>
         <TabsTrigger value="evaluation">Evaluation</TabsTrigger>

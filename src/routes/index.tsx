@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Settings2, Play, Pause, RotateCcw, StepForward, Box, Trash2, Square, Eraser,
   Flag, MapPin, Network, Route as RouteIcon, Timer, CheckCircle2, XCircle, Activity,
-  Table2, BarChart3, Clock, Download, Crown, GraduationCap,
+  Table2, BarChart3, Clock, Download, Crown, GraduationCap, Menu, X,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, Cell, LabelList,
@@ -50,6 +50,7 @@ function Index() {
   const [learningStep, setLearningStep] = useState(0);
   const [learningPlaying, setLearningPlaying] = useState(false);
   const [stepwiseResult, setStepwiseResult] = useState<StepwiseSearchResult | null>(null);
+  const [mobilePanelOpen, setMobilePanelOpen] = useState<"controls" | "stats" | null>(null);
   const drawing = useRef(false);
 
   // Seed a maze on the client after hydration (random).
@@ -223,11 +224,23 @@ function Index() {
             <p className="truncate text-xs text-muted-foreground">Explore how AI search algorithms find a path</p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1 rounded-md border border-border p-1" role="tablist" aria-label="Game">
-          <Button size="sm" variant={gameView === "pathfinding" ? "default" : "ghost"} role="tab" aria-selected={gameView === "pathfinding"} onClick={() => { setGameView("pathfinding"); setPlaying(false); exitLearningMode(); }}><Network />Pathfinding</Button>
-          <Button size="sm" variant={gameView === "chess" ? "default" : "ghost"} role="tab" aria-selected={gameView === "chess"} onClick={() => { setGameView("chess"); setPlaying(false); exitLearningMode(); }}><Crown />Chess</Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1 rounded-md border border-border p-1" role="tablist" aria-label="Game">
+            <Button size="sm" variant={gameView === "pathfinding" ? "default" : "ghost"} role="tab" aria-selected={gameView === "pathfinding"} onClick={() => { setGameView("pathfinding"); setPlaying(false); exitLearningMode(); }}><Network /><span className="hidden sm:inline">Pathfinding</span></Button>
+            <Button size="sm" variant={gameView === "chess" ? "default" : "ghost"} role="tab" aria-selected={gameView === "chess"} onClick={() => { setGameView("chess"); setPlaying(false); exitLearningMode(); }}><Crown /><span className="hidden sm:inline">Chess</span></Button>
+          </div>
+          {gameView === "pathfinding" && (
+            <>
+              <Button size="sm" variant="outline" className="lg:hidden" onClick={() => setMobilePanelOpen(mobilePanelOpen === "controls" ? null : "controls")} aria-label="Toggle controls">
+                <Settings2 className="h-4 w-4" />Controls
+              </Button>
+              <Button size="sm" variant="outline" className="lg:hidden" onClick={() => setMobilePanelOpen(mobilePanelOpen === "stats" ? null : "stats")} aria-label="Toggle stats">
+                <BarChart3 className="h-4 w-4" />Stats
+              </Button>
+            </>
+          )}
         </div>
-        <div className={gameView === "pathfinding" ? "flex gap-2" : "hidden"}>
+        <div className={gameView === "pathfinding" ? "hidden lg:flex gap-2" : "hidden"}>
           <Btn onClick={() => { setGrid(generateMaze(size)); resetRun(); exitLearningMode(); }}><Box className="h-4 w-4" />Random Maze</Btn>
           <Btn onClick={() => { setGrid(emptyGrid(size)); resetRun(); exitLearningMode(); }}><Trash2 className="h-4 w-4" />Clear Grid</Btn>
           <Button size="sm" variant={learningMode ? "default" : "outline"} onClick={learningMode ? exitLearningMode : startLearningMode}>
@@ -240,10 +253,20 @@ function Index() {
       <div className={gameView === "chess" ? "flex min-h-0 flex-1 flex-col" : "hidden"}><ChessArena active={gameView === "chess"} /></div>
       <div className={gameView === "pathfinding" ? "flex min-h-0 flex-1 flex-col gap-3" : "hidden"}>
 
+      {/* Mobile Floating Actions */}
+      <div className="flex gap-2 lg:hidden">
+        <div className="flex-1"><Btn onClick={() => { setGrid(generateMaze(size)); resetRun(); exitLearningMode(); }}><Box className="h-4 w-4" />Maze</Btn></div>
+        <div className="flex-1"><Btn onClick={() => { setGrid(emptyGrid(size)); resetRun(); exitLearningMode(); }}><Trash2 className="h-4 w-4" />Clear</Btn></div>
+        <div className="flex-1"><Button size="sm" variant={learningMode ? "default" : "outline"} onClick={learningMode ? exitLearningMode : startLearningMode}>
+          <GraduationCap className="h-4 w-4" />
+          {learningMode ? "Exit" : "Learn"}
+        </Button></div>
+      </div>
+
       {/* Workspace */}
-      <section className="grid min-h-0 flex-1 gap-3 grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_280px]">
+      <section className="grid min-h-0 flex-1 gap-3 grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_280px] relative">
         {/* Controls */}
-        <aside className="panel flex flex-col gap-3 p-4 lg:overflow-y-auto" aria-label="Controls">
+        <aside className="hidden lg:flex panel flex-col gap-3 p-4 lg:overflow-y-auto" aria-label="Controls">
           <PanelTitle icon={Settings2}>Algorithm & Settings</PanelTitle>
           {learningMode ? (
             <div className="flex flex-col gap-3 overflow-y-auto">
@@ -348,7 +371,7 @@ function Index() {
         </div>
 
         {/* Stats */}
-        <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto" aria-label="Results">
+        <aside className="hidden lg:flex flex min-h-0 flex-col gap-3 overflow-y-auto" aria-label="Results">
           {learningMode ? (
             <>
               <SearchTrace step={stepwiseResult?.steps[learningStep] || null} algo={algo} gridSize={size} />
@@ -385,6 +408,152 @@ function Index() {
             </>
           )}
         </aside>
+
+        {/* Mobile Controls Panel */}
+        {mobilePanelOpen === "controls" && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setMobilePanelOpen(null)} />
+            <div className="absolute bottom-0 left-0 right-0 max-h-[70vh] overflow-y-auto rounded-t-xl bg-background p-4 shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Controls</h2>
+                <Button size="icon" variant="ghost" onClick={() => setMobilePanelOpen(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex flex-col gap-3">
+                <PanelTitle icon={Settings2}>Algorithm & Settings</PanelTitle>
+                {learningMode ? (
+                  <div className="flex flex-col gap-3 overflow-y-auto">
+                    <AlgorithmExplanation algo={algo} heuristic={heuristic} />
+                    <div className="rounded-lg border border-border p-3">
+                      <p className="mb-2 text-xs font-semibold">Learning Mode Controls</p>
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <Button size="sm" variant="outline" onClick={learningPrev} disabled={learningStep === 0}>
+                          Previous
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={learningNext} disabled={!stepwiseResult || learningStep >= stepwiseResult.steps.length - 1}>
+                          Next
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button size="sm" variant={learningPlaying ? "default" : "outline"} onClick={toggleLearningPlay}>
+                          {learningPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          {learningPlaying ? "Pause" : "Play"}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={resetLearning}>
+                          <RotateCcw className="h-4 w-4" />Reset
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={exitLearningMode}>
+                          Exit
+                        </Button>
+                      </div>
+                      <p className="mt-2 text-xs text-center text-muted-foreground">
+                        Step {learningStep + 1} of {stepwiseResult?.steps.length || 0}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <AlgorithmGuide rows={comparison} heuristic={heuristic} />
+                    <Field label="Algorithm">
+                      <select className="input" value={algo} onChange={(e) => { setAlgo(e.target.value as Algo); resetRun(); }}>
+                        {ALGOS.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Grid size" value={`${size} × ${size}`}>
+                      <input type="range" min={11} max={41} step={2} value={size} onChange={(e) => changeSize(+e.target.value)} className="w-full accent-primary" aria-label="Grid size" />
+                    </Field>
+                    <Field label="Heuristic (A*, Greedy)">
+                      <select className="input" value={heuristic} onChange={(e) => { setHeuristic(e.target.value as Heuristic); resetRun(); }}>
+                        <option value="manhattan">Manhattan distance</option>
+                        <option value="euclidean">Euclidean distance</option>
+                        <option value="chebyshev">Chebyshev distance</option>
+                      </select>
+                    </Field>
+                    <Field label="Animation speed" value={`${speed}`}>
+                      <input type="range" min={1} max={11} value={speed} onChange={(e) => setSpeed(+e.target.value)} className="w-full accent-primary" aria-label="Animation speed" />
+                    </Field>
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold">Maze tools <span className="font-normal text-muted-foreground">(click / drag)</span></p>
+                      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Edit mode">
+                        {([
+                          ["wall", "Add wall", Square], ["erase", "Erase", Eraser],
+                          ["start", "Set start", MapPin], ["goal", "Set goal", Flag],
+                        ] as const).map(([m, label, I]) => (
+                          <Button variant="outline" size="sm" key={m} role="radio" aria-checked={mode === m} onClick={() => setMode(m)}
+                            className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${mode === m ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted"}`}>
+                            <I className="h-4 w-4" />{label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {playing ? (
+                        <Btn primary onClick={() => setPlaying(false)}><Pause className="h-4 w-4" />Pause</Btn>
+                      ) : (
+                        <Btn primary onClick={play}><Play className="h-4 w-4" />{step > 0 && !done ? "Resume" : "Play"}</Btn>
+                      )}
+                      <Btn onClick={stepOnce}><StepForward className="h-4 w-4" />Step</Btn>
+                      <Btn onClick={resetRun}><RotateCcw className="h-4 w-4" />Reset</Btn>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Stats Panel */}
+        {mobilePanelOpen === "stats" && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setMobilePanelOpen(null)} />
+            <div className="absolute bottom-0 left-0 right-0 max-h-[70vh] overflow-y-auto rounded-t-xl bg-background p-4 shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Stats</h2>
+                <Button size="icon" variant="ghost" onClick={() => setMobilePanelOpen(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex flex-col gap-3">
+                {learningMode ? (
+                  <>
+                    <SearchTrace step={stepwiseResult?.steps[learningStep] || null} algo={algo} gridSize={size} />
+                    <OptimalityAnalysis
+                      result={stepwiseResult || result}
+                      algo={algo}
+                      bfsResult={comparison.find((c) => c.id === "bfs")?.result || null}
+                      executionTime={current.ms}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <div className="panel p-4">
+                      <PanelTitle icon={BarChart3}>{algoMeta.name}</PanelTitle>
+                      <div className="mt-3 grid grid-cols-2 gap-2" aria-live="polite">
+                        <Stat icon={Network} label="Nodes explored" value={explored} />
+                        <Stat icon={RouteIcon} label="Path length" value={done && result.found ? result.path.length - 1 : "—"} unit={done && result.found ? "steps" : ""} />
+                        <Stat icon={Timer} label="Exec. time" value={current.ms.toFixed(3)} unit="ms" />
+                        <Stat icon={Activity} label="Status" value={status} small
+                          tone={done ? (result.found ? "text-success" : "text-destructive") : "text-foreground"} />
+                      </div>
+                      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full bg-primary transition-all" style={{ width: `${step < 0 ? 0 : (Math.min(step, total) / Math.max(1, total)) * 100}%` }} />
+                      </div>
+                    </div>
+                    <div className="panel flex-1 p-4">
+                      <h2 className="mb-2 text-sm font-semibold">Legend</h2>
+                      <ul className="grid grid-cols-2 gap-2 text-xs lg:grid-cols-1">
+                        {[["bg-start", "Start (S)"], ["bg-goal", "Goal (G)"], ["bg-wall", "Wall"], ["bg-visited", "Visited"], ["bg-frontier", "Frontier"], ["bg-path", "Final path"]].map(([c, l]) => (
+                          <li key={l} className="flex items-center gap-2"><span className={`h-4 w-4 rounded ${c}`} />{l}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Comparison */}

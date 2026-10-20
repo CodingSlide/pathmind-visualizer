@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Chess, type PieceSymbol } from "chess.js";
-import { Play, Pause, RotateCcw, StepForward, Crown, Cpu, ArrowDownUp, BookOpen } from "lucide-react";
+import { Play, Pause, RotateCcw, StepForward, Crown, Cpu, ArrowDownUp, BookOpen, Settings2, BarChart3, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,6 +24,7 @@ export function ChessArena({ active }: { active: boolean }) {
   const [flipped, setFlipped] = useState(false);
   const [history, setHistory] = useState<TurnRecord[]>([]);
   const [error, setError] = useState("");
+  const [mobilePanelOpen, setMobilePanelOpen] = useState<"settings" | "stats" | null>(null);
   const board = game.current.board();
   const turn = game.current.turn();
   const over = game.current.isGameOver();
@@ -68,8 +69,18 @@ export function ChessArena({ active }: { active: boolean }) {
   else if (game.current.isDraw()) status = "Draw · 50-move rule";
   else if (game.current.isCheck()) status += " · check";
 
-  return <section className="chess-workspace grid min-h-0 flex-1 gap-3 grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_280px]" aria-label="Chess arena">
-    <aside className="panel flex flex-col gap-4 p-4 lg:overflow-y-auto">
+  return <section className="chess-workspace grid min-h-0 flex-1 gap-3 grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_280px] relative" aria-label="Chess arena">
+    {/* Mobile Toggle Buttons */}
+    <div className="flex gap-2 lg:hidden absolute top-2 right-2 z-10">
+      <Button size="sm" variant="outline" onClick={() => setMobilePanelOpen(mobilePanelOpen === "settings" ? null : "settings")} aria-label="Settings">
+        <Settings2 className="h-4 w-4" />Settings
+      </Button>
+      <Button size="sm" variant="outline" onClick={() => setMobilePanelOpen(mobilePanelOpen === "stats" ? null : "stats")} aria-label="Stats">
+        <BarChart3 className="h-4 w-4" />Stats
+      </Button>
+    </div>
+
+    <aside className="hidden lg:flex panel flex flex-col gap-4 p-4 lg:overflow-y-auto">
       <h2 className="flex items-center gap-2 text-sm font-semibold"><Cpu className="h-4 w-4 text-primary" />AI match settings</h2>
       {([["w", "White algorithm", white], ["b", "Black algorithm", black]] as const).map(([side, label, value]) => <label key={side} className="text-xs font-medium">{label}<select aria-label={label} className="input mt-1" value={value} onChange={(e) => { cancel(); (side === "w" ? setWhite : setBlack)(e.target.value as ChessAlgorithm); }}>{CHESS_ALGORITHMS.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>)}
       <label className="text-xs font-medium">Search depth <span className="float-right font-mono">{depth} {depth === 1 ? "ply" : "plies"}</span><input className="mt-2 w-full accent-primary" type="range" aria-label="Chess search depth" min="1" max="3" value={depth} onChange={(e) => { cancel(); setDepth(+e.target.value); }} /></label>
@@ -100,11 +111,59 @@ export function ChessArena({ active }: { active: boolean }) {
       </div>
       <div className="flex w-full items-center justify-between gap-2 text-xs"><span className="flex items-center gap-2"><Crown className="h-4 w-4" />{flipped ? "Black" : "White"} · {nameOf(flipped ? black : white)}</span><span className="font-mono text-muted-foreground">Move {Math.floor(history.length / 2) + 1}</span></div>
     </div>
-    <aside className="flex min-h-0 flex-col gap-3">
+    <aside className="hidden lg:flex flex min-h-0 flex-col gap-3">
       <div className="panel p-4"><h2 className="text-sm font-semibold">Match status</h2><p className="mt-2 text-sm font-semibold text-primary" aria-live="polite">{status}</p>{error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}</div>
       <div className="panel p-4"><h2 className="text-sm font-semibold">Latest search by side</h2>{(["w", "b"] as const).map((side) => { const record = history.filter((h) => h.side === side).at(-1); return <div key={side} className="mt-3 border-t border-border pt-3"><h3 className="text-xs font-semibold">{side === "w" ? "White" : "Black"} · {record ? nameOf(record.algorithm) : nameOf(side === "w" ? white : black)}</h3><dl className="mt-2 grid grid-cols-2 gap-y-2 text-xs"><dt className="text-muted-foreground">Positions</dt><dd className="text-right font-mono">{record?.result.nodes.toLocaleString() ?? "—"}</dd><dt className="text-muted-foreground">Search time</dt><dd className="text-right font-mono">{record ? `${record.result.ms.toFixed(1)} ms` : "—"}</dd><dt className="text-muted-foreground">Pruned branches</dt><dd className="text-right font-mono">{record?.result.cutoffs ?? "—"}</dd><dt className="text-muted-foreground">Depth</dt><dd className="text-right font-mono">{record?.depth ?? "—"}</dd></dl></div>; })}</div>
       <div className="panel flex min-h-[160px] flex-1 flex-col p-4 lg:min-h-0"><h2 className="mb-2 text-sm font-semibold">Move history <span className="font-normal text-muted-foreground">· {history.length} plies</span></h2><div className="max-h-64 overflow-y-auto lg:max-h-none lg:flex-1" aria-label="Move history">{history.length === 0 ? <p className="text-xs text-muted-foreground">No moves yet</p> : <table className="w-full text-xs"><thead><tr className="text-left text-muted-foreground"><th className="py-1">#</th><th>White</th><th>Black</th></tr></thead><tbody>{Array.from({ length: Math.ceil(history.length / 2) }, (_, i) => <tr key={i} className="border-t border-border"><td className="py-2 text-muted-foreground">{i + 1}.</td><td className="font-mono">{history[i * 2]?.san}</td><td className="font-mono">{history[i * 2 + 1]?.san ?? "—"}</td></tr>)}</tbody></table>}</div></div>
     </aside>
+
+    {/* Mobile Settings Panel */}
+    {mobilePanelOpen === "settings" && (
+      <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="absolute inset-0 bg-black/50" onClick={() => setMobilePanelOpen(null)} />
+        <div className="absolute bottom-0 left-0 right-0 max-h-[70vh] overflow-y-auto rounded-t-xl bg-background p-4 shadow-lg">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Settings</h2>
+            <Button size="icon" variant="ghost" onClick={() => setMobilePanelOpen(null)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex flex-col gap-4">
+            <h2 className="flex items-center gap-2 text-sm font-semibold"><Cpu className="h-4 w-4 text-primary" />AI match settings</h2>
+            {([["w", "White algorithm", white], ["b", "Black algorithm", black]] as const).map(([side, label, value]) => <label key={side} className="text-xs font-medium">{label}<select aria-label={label} className="input mt-1" value={value} onChange={(e) => { cancel(); (side === "w" ? setWhite : setBlack)(e.target.value as ChessAlgorithm); }}>{CHESS_ALGORITHMS.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>)}
+            <label className="text-xs font-medium">Search depth <span className="float-right font-mono">{depth} {depth === 1 ? "ply" : "plies"}</span><input className="mt-2 w-full accent-primary" type="range" aria-label="Chess search depth" min="1" max="3" value={depth} onChange={(e) => { cancel(); setDepth(+e.target.value); }} /></label>
+            <label className="text-xs font-medium">Move interval <span className="float-right font-mono">{(delay / 1000).toFixed(1)} s</span><input className="mt-2 w-full accent-primary" type="range" aria-label="Move interval" min="100" max="2000" step="100" value={delay} onChange={(e) => setDelay(+e.target.value)} /></label>
+            <div className="grid grid-cols-3 gap-2">
+              <Button size="sm" disabled={over} onClick={() => { if (playing || thinking) cancel(); else { setPlaying(true); setMobilePanelOpen(null); } }}>{playing || thinking ? <Pause /> : <Play />}{playing || thinking ? "Pause" : "Play"}</Button>
+              <Button variant="outline" size="sm" disabled={over || thinking} onClick={() => { setPlaying(false); setSingle((v) => v + 1); setMobilePanelOpen(null); }}><StepForward />Step</Button>
+              <Button variant="outline" size="sm" onClick={() => { reset(); setMobilePanelOpen(null); }} title="Reset chess match"><RotateCcw /><span className="sr-only">Reset chess</span></Button>
+            </div>
+            <ChessGuide />
+            <div className="mt-auto border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground"><h3 className="mb-2 font-semibold text-foreground">Search matchup</h3><p>Both engines use the same material and piece-position evaluation. Alpha-beta skips branches that cannot improve the decision; minimax evaluates every branch to the selected depth.</p></div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Mobile Stats Panel */}
+    {mobilePanelOpen === "stats" && (
+      <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="absolute inset-0 bg-black/50" onClick={() => setMobilePanelOpen(null)} />
+        <div className="absolute bottom-0 left-0 right-0 max-h-[70vh] overflow-y-auto rounded-t-xl bg-background p-4 shadow-lg">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Stats</h2>
+            <Button size="icon" variant="ghost" onClick={() => setMobilePanelOpen(null)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex flex-col gap-3">
+            <div className="panel p-4"><h2 className="text-sm font-semibold">Match status</h2><p className="mt-2 text-sm font-semibold text-primary" aria-live="polite">{status}</p>{error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}</div>
+            <div className="panel p-4"><h2 className="text-sm font-semibold">Latest search by side</h2>{(["w", "b"] as const).map((side) => { const record = history.filter((h) => h.side === side).at(-1); return <div key={side} className="mt-3 border-t border-border pt-3"><h3 className="text-xs font-semibold">{side === "w" ? "White" : "Black"} · {record ? nameOf(record.algorithm) : nameOf(side === "w" ? white : black)}</h3><dl className="mt-2 grid grid-cols-2 gap-y-2 text-xs"><dt className="text-muted-foreground">Positions</dt><dd className="text-right font-mono">{record?.result.nodes.toLocaleString() ?? "—"}</dd><dt className="text-muted-foreground">Search time</dt><dd className="text-right font-mono">{record ? `${record.result.ms.toFixed(1)} ms` : "—"}</dd><dt className="text-muted-foreground">Pruned branches</dt><dd className="text-right font-mono">{record?.result.cutoffs ?? "—"}</dd><dt className="text-muted-foreground">Depth</dt><dd className="text-right font-mono">{record?.depth ?? "—"}</dd></dl></div>; })}</div>
+            <div className="panel flex-1 p-4"><h2 className="mb-2 text-sm font-semibold">Move history <span className="font-normal text-muted-foreground">· {history.length} plies</span></h2><div className="max-h-64 overflow-y-auto" aria-label="Move history">{history.length === 0 ? <p className="text-xs text-muted-foreground">No moves yet</p> : <table className="w-full text-xs"><thead><tr className="text-left text-muted-foreground"><th className="py-1">#</th><th>White</th><th>Black</th></tr></thead><tbody>{Array.from({ length: Math.ceil(history.length / 2) }, (_, i) => <tr key={i} className="border-t border-border"><td className="py-2 text-muted-foreground">{i + 1}.</td><td className="font-mono">{history[i * 2]?.san}</td><td className="font-mono">{history[i * 2 + 1]?.san ?? "—"}</td></tr>)}</tbody></table>}</div></div>
+          </div>
+        </div>
+      </div>
+    )}
   </section>;
 }
 

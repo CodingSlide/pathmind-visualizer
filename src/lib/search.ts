@@ -23,6 +23,30 @@ export interface SearchResult {
   found: boolean;
 }
 
+export interface SearchStep {
+  step: number;
+  currentNode: number;
+  frontier: number[];
+  frontierData: Array<{ node: number; f?: number; g?: number; h?: number; depth?: number }>;
+  visited: number[];
+  path: number[];
+  explanation: string;
+  algorithmSpecific: {
+    queue?: number[];
+    stack?: number[];
+    priorityQueue?: Array<{ node: number; priority: number }>;
+    gValues?: Map<number, number>;
+    hValues?: Map<number, number>;
+    fValues?: Map<number, number>;
+    depth?: number;
+    backtracking?: boolean;
+  };
+}
+
+export interface StepwiseSearchResult extends SearchResult {
+  steps: SearchStep[];
+}
+
 function h(a: number, b: number, n: number, kind: Heuristic) {
   const dx = Math.abs((a % n) - (b % n));
   const dy = Math.abs(Math.floor(a / n) - Math.floor(b / n));
@@ -149,6 +173,171 @@ export function runSearch(grid: Grid, algo: Algo, heuristic: Heuristic = "manhat
     path.reverse();
   }
   return { order, visitedAt, addedAt, path, found };
+}
+
+export function runStepwiseSearch(grid: Grid, algo: Algo, heuristic: Heuristic = "manhattan"): StepwiseSearchResult {
+  const { size: n, walls, start, goal } = grid;
+  const N = n * n;
+  const visitedAt = new Int32Array(N).fill(-1);
+  const addedAt = new Int32Array(N).fill(-1);
+  const parent = new Int32Array(N).fill(-1);
+  const order: number[] = [];
+  const steps: SearchStep[] = [];
+  let found = false;
+  let step = 0;
+
+  const addStep = (
+    currentNode: number,
+    frontier: number[],
+    frontierData: SearchStep["frontierData"],
+    explanation: string,
+    algorithmSpecific: SearchStep["algorithmSpecific"] = {}
+  ) => {
+    const visited = order.slice();
+    const path: number[] = [];
+    if (found) {
+      for (let c = goal; c !== -1; c = parent[c] ?? -1) path.push(c);
+      path.reverse();
+    }
+    steps.push({
+      step,
+      currentNode,
+      frontier: frontier.slice(),
+      frontierData: frontierData.slice(),
+      visited,
+      path,
+      explanation,
+      algorithmSpecific,
+    });
+  };
+
+  const expand = (c: number) => { visitedAt[c] = step; order.push(c); step++; };
+
+  // Initial step
+  addStep(start, [start], [{ node: start }], `Starting search from node ${start}. Adding start to frontier.`);
+
+  if (algo === "bfs") {
+    const q = [start]; let head = 0; addedAt[start] = 0;
+    while (head < q.length) {
+      const c = q[head++];
+      if (c === undefined) break;
+      expand(c);
+      addStep(c, q.slice(head), [], `Expanding node ${c} (FIFO queue). Checking neighbors...`, { queue: q.slice(head) });
+      if (c === goal) { found = true; break; }
+      for (const nb of neighbors(c, n, walls)) {
+        if (addedAt[nb] === -1) {
+          addedAt[nb] = step;
+          parent[nb] = c;
+          q.push(nb);
+        }
+      }
+    }
+  } else if (algo === "dfs") {
+    const st = [start]; addedAt[start] = 0;
+    while (st.length) {
+      const c = st.pop();
+      if (c === undefined) break;
+      if (visitedAt[c] !== -1) {
+        addStep(c, st.slice(), [], `Node ${c} already visited. Backtracking...`, { stack: st.slice(), backtracking: true });
+        continue;
+      }
+      expand(c);
+      addStep(c, st.slice(), [], `Expanding node ${c} (LIFO stack). Going deep...`, { stack: st.slice(), depth: st.length });
+      if (c === goal) { found = true; break; }
+      const nbs = neighbors(c, n, walls);
+      for (let k = nbs.length - 1; k >= 0; k--) {
+        const nb = nbs[k];
+        if (nb === undefined) continue;
+        if (visitedAt[nb] === -1) {
+          parent[nb] = c;
+          addedAt[nb] = addedAt[nb] === -1 ? step : (addedAt[nb] ?? step);
+          st.push(nb);
+        }
+      }
+    }
+  } else {
+    const g = new Float64Array(N).fill(Infinity);
+    const gValues = new Map<number, number>();
+    const hValues = new Map<number, number>();
+    const fValues = new Map<number, number>();
+    g[start] = 0;
+    gValues.set(start, 0);
+    const startH = h(start, goal, n, heuristic);
+    hValues.set(start, startH);
+    fValues.set(start, startH);
+    const heap = new MinHeap(); let tie = 0;
+    heap.push([startH, 0, start]); addedAt[start] = 0;
+
+    addStep(start, [start], [{ node: start, f: startH, g: 0, h: startH }],
+      `Starting ${algo === "astar" ? "A*" : "Greedy"} search. f(${start}) = g(${start}) + h(${start}) = 0 + ${startH.toFixed(1)} = ${startH.toFixed(1)}.`,
+      { priorityQueue: [{ node: start, priority: startH }], gValues, hValues, fValues });
+
+    while (heap.size) {
+      const entry = heap.pop();
+      if (!entry) break;
+      const [, , c] = entry;
+      if (visitedAt[c] !== -1) {
+        addStep(c, [], [], `Node ${c} already visited with better cost. Skipping.`, { priorityQueue: [], gValues, hValues, fValues });
+        continue;
+      }
+      expand(c);
+      const currentG = g[c] ?? Infinity;
+      const currentH = h(c, goal, n, heuristic);
+      const currentF = currentG + currentH;
+      gValues.set(c, currentG);
+      hValues.set(c, currentH);
+      fValues.set(c, currentF);
+
+      const frontierData: SearchStep["frontierData"] = [];
+      const pq: Array<{ node: number; priority: number }> = [];
+
+      addStep(c, [], frontierData,
+        `Expanding node ${c} with lowest f(n) = ${currentF.toFixed(1)} (g=${currentG.toFixed(1)}, h=${currentH.toFixed(1)}).`,
+        { priorityQueue: pq, gValues: new Map(gValues), hValues: new Map(hValues), fValues: new Map(fValues) });
+
+      if (c === goal) { found = true; break; }
+      for (const nb of neighbors(c, n, walls)) {
+        if (visitedAt[nb] !== -1) continue;
+        const ng = (g[c] ?? Infinity) + 1;
+        const nbH = h(nb, goal, n, heuristic);
+        if (algo === "astar") {
+          if (ng < (g[nb] ?? Infinity)) {
+            g[nb] = ng;
+            parent[nb] = c;
+            gValues.set(nb, ng);
+            hValues.set(nb, nbH);
+            fValues.set(nb, ng + nbH);
+            if (addedAt[nb] === -1) addedAt[nb] = step;
+            const priority = ng + nbH;
+            heap.push([priority, ++tie + nbH * 1e6, nb]);
+            pq.push({ node: nb, priority });
+            frontierData.push({ node: nb, f: priority, g: ng, h: nbH });
+          }
+        } else if (addedAt[nb] === -1) {
+          addedAt[nb] = step;
+          parent[nb] = c;
+          gValues.set(nb, ng);
+          hValues.set(nb, nbH);
+          fValues.set(nb, nbH);
+          const priority = nbH;
+          heap.push([priority, ++tie, nb]);
+          pq.push({ node: nb, priority });
+          frontierData.push({ node: nb, f: priority, h: nbH });
+        }
+      }
+    }
+  }
+
+  const path: number[] = [];
+  if (found) {
+    for (let c = goal; c !== -1; c = parent[c] ?? -1) path.push(c);
+    path.reverse();
+  }
+
+  // Final step
+  addStep(found ? goal : -1, [], [], found ? `Goal reached! Path found with ${path.length} nodes.` : "Search complete. No path found.");
+
+  return { order, visitedAt, addedAt, path, found, steps };
 }
 
 /** Times an algorithm by averaging repeated runs for sub-millisecond precision. */

@@ -14,14 +14,30 @@ function evaluate(game: Chess, ply: number): number {
     const centrality = 3.5 - (Math.abs(x - 3.5) + Math.abs(y - 3.5)) / 2;
     const advance = piece.color === "w" ? 6 - y : y - 1;
     const bonus = piece.type === "p" ? advance * 8 + centrality * 3 : piece.type === "k" ? 0 : centrality * 12;
-    score += (PIECE_VALUES[piece.type] + bonus) * (piece.color === "w" ? 1 : -1);
+    score += (PIECE_VALUES[piece.type!] + bonus) * (piece.color === "w" ? 1 : -1);
   }));
   return score;
 }
 
 function orderedMoves(game: Chess): Move[] {
-  const priority = (move: Move) => (move.captured ? PIECE_VALUES[move.captured] * 10 - PIECE_VALUES[move.piece] : 0) + (move.promotion ? PIECE_VALUES[move.promotion] : 0);
-  return game.moves({ verbose: true }).sort((a, b) => priority(b) - priority(a));
+  const priority = (move: Move) => (move.captured ? PIECE_VALUES[move.captured!] * 10 - PIECE_VALUES[move.piece!] : 0) + (move.promotion ? PIECE_VALUES[move.promotion!] : 0);
+  const moves = game.moves({ verbose: true });
+  moves.sort((a, b) => priority(b) - priority(a));
+  // Shuffle moves with equal priority to add variety and prevent repetition
+  for (let i = 0; i < moves.length - 1; i++) {
+    const moveI = moves[i];
+    const moveNext = moves[i + 1];
+    if (moveI && moveNext && priority(moveI) === priority(moveNext)) {
+      const j = i + 1 + Math.floor(Math.random() * (moves.length - i - 1));
+      const moveJ = moves[j];
+      if (moveJ) {
+        const temp = moves[i]!;
+        moves[i] = moves[j]!;
+        moves[j] = temp;
+      }
+    }
+  }
+  return moves;
 }
 
 export function searchChess(fen: string, algorithm: ChessAlgorithm, depth: number): ChessSearchResult {

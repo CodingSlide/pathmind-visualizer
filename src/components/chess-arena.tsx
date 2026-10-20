@@ -3,6 +3,7 @@ import { Chess, type PieceSymbol } from "chess.js";
 import { Play, Pause, RotateCcw, StepForward, Crown, Cpu, ArrowDownUp, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CHESS_ALGORITHMS, type ChessAlgorithm, type ChessSearchResult } from "@/lib/chess-engine";
 
 const GLYPHS: Record<PieceSymbol, string> = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
@@ -108,9 +109,111 @@ export function ChessArena({ active }: { active: boolean }) {
 }
 
 function ChessGuide() {
-  return <Dialog><DialogTrigger asChild><Button size="sm" variant="outline"><BookOpen />Chess algorithm guide</Button></DialogTrigger><DialogContent className="max-h-[85dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto"><DialogTitle>How the chess engines decide</DialogTitle><DialogDescription>Minimax versus alpha-beta pruning · both sides play automatically</DialogDescription>
-    <section className="text-sm leading-relaxed"><h3 className="mb-2 font-semibold">Minimax</h3><p>White maximizes the position score and Black minimizes it. The engine tries every legal move, then every opponent response, continuing to the chosen depth. It assumes the opponent chooses their best reply and backs those scores up to select a move. With b legal moves per position and depth d, work grows roughly as O(b^d).</p></section>
-    <section className="text-sm leading-relaxed"><h3 className="mb-2 font-semibold">Alpha-beta pruning</h3><p>This is minimax with bounds: alpha is the best score White can already secure; beta is the best score Black can already secure. When alpha meets or exceeds beta, the rest of that branch cannot change the choice and is skipped. Both engines order captures and promotions first, but only alpha-beta prunes. It gives the same score at equal depth; tied moves may differ. Best-case work approaches O(b^(d/2)); worst case remains O(b^d).</p></section>
-    <section className="text-sm leading-relaxed"><h3 className="mb-2 font-semibold">Evaluation, depth and time</h3><p>Scores favor White when positive and Black when negative. Pawns are worth 100, knights 320, bishops 330, rooks 500 and queens 900; small bonuses reward central pieces and pawn advancement. Checkmate dominates the score, and detected draws score zero. One ply is one side's move, not a full turn.</p><p className="mt-2 text-muted-foreground">Search time is measured inside the chess worker for one move, excluding the move interval and board rendering. Positions counts evaluated search nodes; pruned branches counts cutoffs, not all skipped positions. Greater depth is much slower. Branching, move ordering and captures influence pruning, so different sides' times are not a controlled benchmark. This is a teaching engine, not tournament-strength chess: it has no opening book, quiescence search or transposition table. The live match tracks repetition; each search starts from the current position, without earlier match repetition history.</p></section>
+  return <Dialog><DialogTrigger asChild><Button size="sm" variant="outline"><BookOpen />Chess algorithm guide</Button></DialogTrigger><DialogContent className="max-h-[85dvh] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto"><DialogTitle>How the chess engines decide</DialogTitle><DialogDescription>Minimax versus alpha-beta pruning · both sides play automatically</DialogDescription>
+    <Tabs defaultValue="minimax" className="mt-4">
+      <TabsList className="grid w-full grid-cols-3">
+        <TabsTrigger value="minimax">Minimax</TabsTrigger>
+        <TabsTrigger value="alphabeta">Alpha-Beta</TabsTrigger>
+        <TabsTrigger value="evaluation">Evaluation</TabsTrigger>
+      </TabsList>
+      <TabsContent value="minimax" className="space-y-4 mt-4">
+        <section className="text-sm leading-relaxed">
+          <h3 className="mb-2 font-semibold">How Minimax Works</h3>
+          <p>Minimax is a recursive algorithm for two-player games. It assumes both players play optimally:</p>
+          <ol className="mt-2 space-y-1 list-decimal list-inside text-muted-foreground">
+            <li>At MAX nodes (White's turn), choose the move with the highest score</li>
+            <li>At MIN nodes (Black's turn), choose the move with the lowest score</li>
+            <li>Continue recursively until the search depth is reached</li>
+            <li>At leaf nodes, evaluate the position using a scoring function</li>
+            <li>Backpropagate scores up the tree to select the best move</li>
+          </ol>
+        </section>
+        <section className="rounded-lg bg-muted p-3">
+          <h3 className="mb-2 font-semibold">Game Tree Example</h3>
+          <p className="text-xs text-muted-foreground mb-2">Consider a simplified position with 2 moves each:</p>
+          <div className="text-xs font-mono space-y-1">
+            <p>MAX (White)</p>
+            <p className="ml-4">├─ Move A → MIN → [8, 3, 5] → MIN chooses 3</p>
+            <p className="ml-4">└─ Move B → MIN → [6, 7, 2] → MIN chooses 2</p>
+            <p className="mt-2">MAX chooses Move A (score 3) over Move B (score 2)</p>
+          </div>
+        </section>
+        <section className="text-sm leading-relaxed">
+          <h3 className="mb-2 font-semibold">Complexity</h3>
+          <p>With <strong>b</strong> legal moves per position and search depth <strong>d</strong>, Minimax evaluates approximately <strong>b^d</strong> positions. This grows exponentially, making deep searches very slow.</p>
+        </section>
+      </TabsContent>
+      <TabsContent value="alphabeta" className="space-y-4 mt-4">
+        <section className="text-sm leading-relaxed">
+          <h3 className="mb-2 font-semibold">How Alpha-Beta Pruning Works</h3>
+          <p>Alpha-beta pruning optimizes Minimax by cutting off branches that cannot affect the final decision:</p>
+          <ul className="mt-2 space-y-1 list-disc list-inside text-muted-foreground">
+            <li><strong>Alpha (α)</strong>: Best score MAX can guarantee so far</li>
+            <li><strong>Beta (β)</strong>: Best score MIN can guarantee so far</li>
+            <li>When α ≥ β, stop searching that branch (prune)</li>
+          </ul>
+        </section>
+        <section className="rounded-lg bg-muted p-3">
+          <h3 className="mb-2 font-semibold">Pruning Example</h3>
+          <div className="text-xs font-mono space-y-1">
+            <p>MAX (White), α = -∞, β = +∞</p>
+            <p className="ml-4">├─ Move A → MIN evaluates to 5 → α = 5</p>
+            <p className="ml-4">└─ Move B → MIN</p>
+            <p className="ml-8">├─ First child returns 3 → β = 3</p>
+            <p className="ml-8">└─ Second child: α (5) ≥ β (3) → PRUNED!</p>
+            <p className="mt-2">Result: MAX chooses Move A without fully exploring Move B</p>
+          </div>
+        </section>
+        <section className="text-sm leading-relaxed">
+          <h3 className="mb-2 font-semibold">Why It Works</h3>
+          <p>If MAX already has a move scoring 5, and MIN finds a response scoring 3, MAX won't choose that branch. Any other responses from MIN will score ≤ 3, so they're irrelevant to MAX's decision.</p>
+        </section>
+        <section className="text-sm leading-relaxed">
+          <h3 className="mb-2 font-semibold">Performance</h3>
+          <p>Best case: <strong>O(b^(d/2))</strong> — searches twice as deep as Minimax in same time</p>
+          <p>Worst case: <strong>O(b^d)</strong> — same as Minimax (no pruning occurs)</p>
+          <p className="text-muted-foreground mt-1">Move ordering (checking good moves first) dramatically improves pruning effectiveness.</p>
+        </section>
+      </TabsContent>
+      <TabsContent value="evaluation" className="space-y-4 mt-4">
+        <section className="text-sm leading-relaxed">
+          <h3 className="mb-2 font-semibold">Position Evaluation</h3>
+          <p>The engine scores positions from Black's perspective (negative = good for Black, positive = good for White):</p>
+          <div className="mt-2 rounded-lg border border-border p-3">
+            <h4 className="font-semibold text-xs mb-2">Piece Values</h4>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div>Pawn: 100</div>
+              <div>Knight: 320</div>
+              <div>Bishop: 330</div>
+              <div>Rook: 500</div>
+              <div>Queen: 900</div>
+              <div>King: 0 (game value)</div>
+            </div>
+          </div>
+        </section>
+        <section className="text-sm leading-relaxed">
+          <h3 className="mb-2 font-semibold">Positional Bonuses</h3>
+          <ul className="space-y-1 text-muted-foreground">
+            <li>• Central pieces get bonuses (knights/bishops: +12 per centrality unit)</li>
+            <li>• Advanced pawns get bonuses (+8 per rank forward)</li>
+            <li>• Checkmate dominates all other factors</li>
+          </ul>
+        </section>
+        <section className="text-sm leading-relaxed">
+          <h3 className="mb-2 font-semibold">Search Depth</h3>
+          <p>One <strong>ply</strong> = one side's move. Depth 2 means "my move, your response." Deeper search sees further ahead but is exponentially slower.</p>
+        </section>
+        <section className="text-sm leading-relaxed">
+          <h3 className="mb-2 font-semibold">Limitations</h3>
+          <p className="text-muted-foreground">This is a teaching engine, not tournament-strength:</p>
+          <ul className="space-y-1 text-muted-foreground">
+            <li>• No opening book (plays from scratch each game)</li>
+            <li>• No transposition table (doesn't remember previous searches)</li>
+            <li>• No quiescence search (doesn't extend tactical sequences)</li>
+            <li>• Simple evaluation function</li>
+          </ul>
+        </section>
+      </TabsContent>
+    </Tabs>
   </DialogContent></Dialog>;
 }

@@ -1,18 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Brain, Settings2, Play, Pause, RotateCcw, StepForward, Box, Trash2, Square, Eraser,
+  Settings2, Play, Pause, RotateCcw, StepForward, Box, Trash2, Square, Eraser,
   Flag, MapPin, Network, Route as RouteIcon, Timer, CheckCircle2, XCircle, Activity,
-  Table2, BarChart3, Clock, Download, Crown,
+  Table2, BarChart3, Clock, Download, Crown, GraduationCap,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line, Cell, LabelList,
 } from "recharts";
 import {
-  ALGOS, emptyGrid, generateMaze, timeSearch, type Algo, type Grid, type Heuristic,
+  ALGOS, emptyGrid, generateMaze, timeSearch, runStepwiseSearch, type Algo, type Grid, type Heuristic, type StepwiseSearchResult,
 } from "@/lib/search";
 import { Button } from "@/components/ui/button";
 import { AlgorithmGuide } from "@/components/algorithm-guide";
+import { AlgorithmExplanation } from "@/components/algorithm-explanation";
+import { SearchTrace } from "@/components/search-trace";
+import { OptimalityAnalysis } from "@/components/optimality-analysis";
 import { ChessArena } from "@/components/chess-arena";
 import { comparisonCsv, downloadComparison } from "@/lib/comparison-csv";
 
@@ -43,6 +46,10 @@ function Index() {
   const [mode, setMode] = useState<Mode>("wall");
   const [step, setStep] = useState(-1); // -1 = idle
   const [playing, setPlaying] = useState(false);
+  const [learningMode, setLearningMode] = useState(false);
+  const [learningStep, setLearningStep] = useState(0);
+  const [learningPlaying, setLearningPlaying] = useState(false);
+  const [stepwiseResult, setStepwiseResult] = useState<StepwiseSearchResult | null>(null);
   const drawing = useRef(false);
 
   // Seed a maze on the client after hydration (random).
@@ -62,6 +69,67 @@ function Index() {
   const done = step >= total;
 
   const resetRun = useCallback(() => { setPlaying(false); setStep(-1); }, []);
+
+  // Run stepwise search when learning mode is enabled
+  useEffect(() => {
+    if (learningMode) {
+      const result = runStepwiseSearch(grid, algo, heuristic);
+      setStepwiseResult(result);
+      setLearningStep(0);
+      setLearningPlaying(false);
+    }
+  }, [learningMode, grid, algo, heuristic]);
+
+  // Auto-play learning mode
+  useEffect(() => {
+    if (!learningMode || !learningPlaying || !stepwiseResult) return;
+    if (learningStep >= stepwiseResult.steps.length - 1) {
+      setLearningPlaying(false);
+      return;
+    }
+    const delay = Math.max(500, 2000 - speed * 150);
+    const id = setTimeout(() => {
+      setLearningStep((s) => s + 1);
+    }, delay);
+    return () => clearTimeout(id);
+  }, [learningMode, learningPlaying, learningStep, stepwiseResult, speed]);
+
+  const startLearningMode = () => {
+    setLearningMode(true);
+    setPlaying(false);
+    setStep(-1);
+  };
+
+  const exitLearningMode = () => {
+    setLearningMode(false);
+    setLearningPlaying(false);
+    setLearningStep(0);
+    setStepwiseResult(null);
+  };
+
+  const learningPrev = () => {
+    setLearningStep((s) => Math.max(0, s - 1));
+    setLearningPlaying(false);
+  };
+
+  const learningNext = () => {
+    if (stepwiseResult && learningStep < stepwiseResult.steps.length - 1) {
+      setLearningStep((s) => s + 1);
+    }
+    setLearningPlaying(false);
+  };
+
+  const toggleLearningPlay = () => {
+    if (stepwiseResult && learningStep >= stepwiseResult.steps.length - 1) {
+      setLearningStep(0);
+    }
+    setLearningPlaying((p) => !p);
+  };
+
+  const resetLearning = () => {
+    setLearningStep(0);
+    setLearningPlaying(false);
+  };
 
   useEffect(() => {
     if (!playing) return;
@@ -96,7 +164,7 @@ function Index() {
     resetRun();
   };
 
-  const changeSize = (n: number) => { setSize(n); setGrid(emptyGrid(n)); resetRun(); };
+  const changeSize = (n: number) => { setSize(n); setGrid(emptyGrid(n)); resetRun(); exitLearningMode(); };
 
   const pathSet = useMemo(() => {
     const m = new Map<number, number>();
@@ -108,6 +176,21 @@ function Index() {
     if (i === grid.start) return "bg-start";
     if (i === grid.goal) return "bg-goal";
     if (grid.walls[i]) return "bg-wall";
+
+    if (learningMode && stepwiseResult) {
+      const currentStep = stepwiseResult.steps[learningStep];
+      if (!currentStep) return "bg-cell";
+
+      const isVisited = currentStep.visited.includes(i);
+      const isFrontier = currentStep.frontier.includes(i);
+      const isPath = currentStep.path.includes(i);
+
+      if (isPath) return "bg-path cell-pop";
+      if (isVisited) return "bg-visited";
+      if (isFrontier) return "bg-frontier";
+      return "bg-cell";
+    }
+
     if (step < 0) return "bg-cell";
     const pk = pathSet.get(i);
     const vs = step - result.order.length;
@@ -132,7 +215,7 @@ function Index() {
       {/* Header */}
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <Brain className="h-8 w-8 shrink-0 text-primary" aria-hidden />
+          <img src="/ICON.png" alt="PathMind AI" className="h-12 w-12 shrink-0" />
           <div className="min-w-0">
             <h1 className="truncate text-lg font-bold leading-tight">
               PathMind AI <span className="font-medium text-muted-foreground">· {gameView === "chess" ? "AI Chess Arena" : "Search Algorithm Visualizer"}</span>
@@ -141,12 +224,16 @@ function Index() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1 rounded-md border border-border p-1" role="tablist" aria-label="Game">
-          <Button size="sm" variant={gameView === "pathfinding" ? "default" : "ghost"} role="tab" aria-selected={gameView === "pathfinding"} onClick={() => { setGameView("pathfinding"); setPlaying(false); }}><Network />Pathfinding</Button>
-          <Button size="sm" variant={gameView === "chess" ? "default" : "ghost"} role="tab" aria-selected={gameView === "chess"} onClick={() => { setGameView("chess"); setPlaying(false); }}><Crown />Chess</Button>
+          <Button size="sm" variant={gameView === "pathfinding" ? "default" : "ghost"} role="tab" aria-selected={gameView === "pathfinding"} onClick={() => { setGameView("pathfinding"); setPlaying(false); exitLearningMode(); }}><Network />Pathfinding</Button>
+          <Button size="sm" variant={gameView === "chess" ? "default" : "ghost"} role="tab" aria-selected={gameView === "chess"} onClick={() => { setGameView("chess"); setPlaying(false); exitLearningMode(); }}><Crown />Chess</Button>
         </div>
         <div className={gameView === "pathfinding" ? "flex gap-2" : "hidden"}>
-          <Btn onClick={() => { setGrid(generateMaze(size)); resetRun(); }}><Box className="h-4 w-4" />Random Maze</Btn>
-          <Btn onClick={() => { setGrid(emptyGrid(size)); resetRun(); }}><Trash2 className="h-4 w-4" />Clear Grid</Btn>
+          <Btn onClick={() => { setGrid(generateMaze(size)); resetRun(); exitLearningMode(); }}><Box className="h-4 w-4" />Random Maze</Btn>
+          <Btn onClick={() => { setGrid(emptyGrid(size)); resetRun(); exitLearningMode(); }}><Trash2 className="h-4 w-4" />Clear Grid</Btn>
+          <Button size="sm" variant={learningMode ? "default" : "outline"} onClick={learningMode ? exitLearningMode : startLearningMode}>
+            <GraduationCap className="h-4 w-4" />
+            {learningMode ? "Exit Learning" : "Learning Mode"}
+          </Button>
         </div>
       </header>
 
@@ -158,48 +245,82 @@ function Index() {
         {/* Controls */}
         <aside className="panel flex flex-col gap-3 p-4 lg:overflow-y-auto" aria-label="Controls">
           <PanelTitle icon={Settings2}>Algorithm & Settings</PanelTitle>
-          <AlgorithmGuide rows={comparison} heuristic={heuristic} />
-          <Field label="Algorithm">
-            <select className="input" value={algo} onChange={(e) => { setAlgo(e.target.value as Algo); resetRun(); }}>
-              {ALGOS.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Grid size" value={`${size} × ${size}`}>
-            <input type="range" min={11} max={41} step={2} value={size} onChange={(e) => changeSize(+e.target.value)} className="w-full accent-primary" aria-label="Grid size" />
-          </Field>
-          <Field label="Heuristic (A*, Greedy)">
-            <select className="input" value={heuristic} onChange={(e) => { setHeuristic(e.target.value as Heuristic); resetRun(); }}>
-              <option value="manhattan">Manhattan distance</option>
-              <option value="euclidean">Euclidean distance</option>
-              <option value="chebyshev">Chebyshev distance</option>
-            </select>
-          </Field>
-          <Field label="Animation speed" value={`${speed}/10`}>
-            <input type="range" min={1} max={10} value={speed} onChange={(e) => setSpeed(+e.target.value)} className="w-full accent-primary" aria-label="Animation speed" />
-          </Field>
-          <div className="grid grid-cols-3 gap-2">
-            {playing ? (
-              <Btn primary onClick={() => setPlaying(false)}><Pause className="h-4 w-4" />Pause</Btn>
-            ) : (
-              <Btn primary onClick={play}><Play className="h-4 w-4" />{step > 0 && !done ? "Resume" : "Play"}</Btn>
-            )}
-            <Btn onClick={stepOnce}><StepForward className="h-4 w-4" />Step</Btn>
-            <Btn onClick={resetRun}><RotateCcw className="h-4 w-4" />Reset</Btn>
-          </div>
-          <div>
-            <p className="mb-1.5 text-xs font-semibold">Maze tools <span className="font-normal text-muted-foreground">(click / drag)</span></p>
-            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Edit mode">
-              {([
-                ["wall", "Add wall", Square], ["erase", "Erase", Eraser],
-                ["start", "Set start", MapPin], ["goal", "Set goal", Flag],
-              ] as const).map(([m, label, I]) => (
-                <Button variant="outline" size="sm" key={m} role="radio" aria-checked={mode === m} onClick={() => setMode(m)}
-                  className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${mode === m ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted"}`}>
-                  <I className="h-4 w-4" />{label}
-                </Button>
-              ))}
+          {learningMode ? (
+            <div className="flex flex-col gap-3 overflow-y-auto">
+              <AlgorithmExplanation algo={algo} heuristic={heuristic} />
+              <div className="rounded-lg border border-border p-3">
+                <p className="mb-2 text-xs font-semibold">Learning Mode Controls</p>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <Button size="sm" variant="outline" onClick={learningPrev} disabled={learningStep === 0}>
+                    Previous
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={learningNext} disabled={!stepwiseResult || learningStep >= stepwiseResult.steps.length - 1}>
+                    Next
+                  </Button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button size="sm" variant={learningPlaying ? "default" : "outline"} onClick={toggleLearningPlay}>
+                    {learningPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                    {learningPlaying ? "Pause" : "Play"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={resetLearning}>
+                    <RotateCcw className="h-4 w-4" />Reset
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={exitLearningMode}>
+                    Exit
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs text-center text-muted-foreground">
+                  Step {learningStep + 1} of {stepwiseResult?.steps.length || 0}
+                </p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <AlgorithmGuide rows={comparison} heuristic={heuristic} />
+              <Field label="Algorithm">
+                <select className="input" value={algo} onChange={(e) => { setAlgo(e.target.value as Algo); resetRun(); }}>
+                  {ALGOS.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Grid size" value={`${size} × ${size}`}>
+                <input type="range" min={11} max={41} step={2} value={size} onChange={(e) => changeSize(+e.target.value)} className="w-full accent-primary" aria-label="Grid size" />
+              </Field>
+              <Field label="Heuristic (A*, Greedy)">
+                <select className="input" value={heuristic} onChange={(e) => { setHeuristic(e.target.value as Heuristic); resetRun(); }}>
+                  <option value="manhattan">Manhattan distance</option>
+                  <option value="euclidean">Euclidean distance</option>
+                  <option value="chebyshev">Chebyshev distance</option>
+                </select>
+              </Field>
+              <Field label="Animation speed" value={`${speed}/10`}>
+                <input type="range" min={1} max={10} value={speed} onChange={(e) => setSpeed(+e.target.value)} className="w-full accent-primary" aria-label="Animation speed" />
+              </Field>
+              <div className="grid grid-cols-3 gap-2">
+                {playing ? (
+                  <Btn primary onClick={() => setPlaying(false)}><Pause className="h-4 w-4" />Pause</Btn>
+                ) : (
+                  <Btn primary onClick={play}><Play className="h-4 w-4" />{step > 0 && !done ? "Resume" : "Play"}</Btn>
+                )}
+                <Btn onClick={stepOnce}><StepForward className="h-4 w-4" />Step</Btn>
+                <Btn onClick={resetRun}><RotateCcw className="h-4 w-4" />Reset</Btn>
+              </div>
+              <div>
+                <p className="mb-1.5 text-xs font-semibold">Maze tools <span className="font-normal text-muted-foreground">(click / drag)</span></p>
+                <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Edit mode">
+                  {([
+                    ["wall", "Add wall", Square], ["erase", "Erase", Eraser],
+                    ["start", "Set start", MapPin], ["goal", "Set goal", Flag],
+                  ] as const).map(([m, label, I]) => (
+                    <Button variant="outline" size="sm" key={m} role="radio" aria-checked={mode === m} onClick={() => setMode(m)}
+                      className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${mode === m ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted"}`}>
+                      <I className="h-4 w-4" />{label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </aside>
 
         {/* Grid */}
@@ -227,33 +348,47 @@ function Index() {
         </div>
 
         {/* Stats */}
-        <aside className="flex min-h-0 flex-col gap-3" aria-label="Results">
-          <div className="panel p-4">
-            <PanelTitle icon={BarChart3}>{algoMeta.name}</PanelTitle>
-            <div className="mt-3 grid grid-cols-2 gap-2" aria-live="polite">
-              <Stat icon={Network} label="Nodes explored" value={explored} />
-              <Stat icon={RouteIcon} label="Path length" value={done && result.found ? result.path.length - 1 : "—"} unit={done && result.found ? "steps" : ""} />
-              <Stat icon={Timer} label="Exec. time" value={current.ms.toFixed(3)} unit="ms" />
-              <Stat icon={Activity} label="Status" value={status} small
-                tone={done ? (result.found ? "text-success" : "text-destructive") : "text-foreground"} />
-            </div>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
-              <div className="h-full bg-primary transition-all" style={{ width: `${step < 0 ? 0 : (Math.min(step, total) / Math.max(1, total)) * 100}%` }} />
-            </div>
-          </div>
-          <div className="panel flex-1 p-4">
-            <h2 className="mb-2 text-sm font-semibold">Legend</h2>
-            <ul className="grid grid-cols-2 gap-2 text-xs lg:grid-cols-1">
-              {[["bg-start", "Start (S)"], ["bg-goal", "Goal (G)"], ["bg-wall", "Wall"], ["bg-visited", "Visited"], ["bg-frontier", "Frontier"], ["bg-path", "Final path"]].map(([c, l]) => (
-                <li key={l} className="flex items-center gap-2"><span className={`h-4 w-4 rounded ${c}`} />{l}</li>
-              ))}
-            </ul>
-          </div>
+        <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto" aria-label="Results">
+          {learningMode ? (
+            <>
+              <SearchTrace step={stepwiseResult?.steps[learningStep] || null} algo={algo} gridSize={size} />
+              <OptimalityAnalysis
+                result={stepwiseResult || result}
+                algo={algo}
+                bfsResult={comparison.find((c) => c.id === "bfs")?.result || null}
+                executionTime={current.ms}
+              />
+            </>
+          ) : (
+            <>
+              <div className="panel p-4">
+                <PanelTitle icon={BarChart3}>{algoMeta.name}</PanelTitle>
+                <div className="mt-3 grid grid-cols-2 gap-2" aria-live="polite">
+                  <Stat icon={Network} label="Nodes explored" value={explored} />
+                  <Stat icon={RouteIcon} label="Path length" value={done && result.found ? result.path.length - 1 : "—"} unit={done && result.found ? "steps" : ""} />
+                  <Stat icon={Timer} label="Exec. time" value={current.ms.toFixed(3)} unit="ms" />
+                  <Stat icon={Activity} label="Status" value={status} small
+                    tone={done ? (result.found ? "text-success" : "text-destructive") : "text-foreground"} />
+                </div>
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full bg-primary transition-all" style={{ width: `${step < 0 ? 0 : (Math.min(step, total) / Math.max(1, total)) * 100}%` }} />
+                </div>
+              </div>
+              <div className="panel flex-1 p-4">
+                <h2 className="mb-2 text-sm font-semibold">Legend</h2>
+                <ul className="grid grid-cols-2 gap-2 text-xs lg:grid-cols-1">
+                  {[["bg-start", "Start (S)"], ["bg-goal", "Goal (G)"], ["bg-wall", "Wall"], ["bg-visited", "Visited"], ["bg-frontier", "Frontier"], ["bg-path", "Final path"]].map(([c, l]) => (
+                    <li key={l} className="flex items-center gap-2"><span className={`h-4 w-4 rounded ${c}`} />{l}</li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
         </aside>
       </section>
 
       {/* Comparison */}
-      <section className="grid gap-3 lg:h-[230px] lg:shrink-0 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]">
+      <section className={learningMode ? "hidden" : "grid gap-3 lg:h-[230px] lg:shrink-0 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)]"}>
         <div className="panel overflow-x-auto p-4">
            <div className="flex flex-wrap items-center justify-between gap-1"><PanelTitle icon={Table2}>Algorithm Comparison</PanelTitle><Button size="sm" variant="ghost" aria-label="Export comparison CSV" title="Export current results as CSV" onClick={() => downloadComparison(comparisonCsv(comparison, grid, heuristic))}><Download />CSV</Button></div>
           <table className="mt-2 w-full text-xs">

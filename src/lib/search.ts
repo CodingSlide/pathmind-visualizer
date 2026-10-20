@@ -154,9 +154,8 @@ export function runSearch(grid: Grid, algo: Algo, heuristic: Heuristic = "manhat
 /** Times an algorithm by averaging repeated runs for sub-millisecond precision. */
 export function timeSearch(grid: Grid, algo: Algo, heuristic: Heuristic) {
   const reps = 15;
-  runSearch(grid, algo, heuristic);
-  const t0 = performance.now();
   let res = runSearch(grid, algo, heuristic);
+  const t0 = performance.now();
   for (let i = 0; i < reps; i++) res = runSearch(grid, algo, heuristic);
   return { result: res, ms: (performance.now() - t0) / reps };
 }
